@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Diario Personal Digital</title>
+  <!-- Cargar Tailwind CSS desde un CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    /* Estilos opcionales para emular una libreta física */
+    body {
+      background-color: #fdfdfd;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+    /* Permite interactuar con el formulario aun cuando el placeholder está visible */
+    #placeholder {
+      pointer-events: none;
+    }
+  </style>
+</head>
+<body class="min-h-screen">
+  <!-- Instrucciones para abrir y usar la aplicación -->
+  <div class="bg-blue-600 text-white text-center p-2">
+    <p>Para abrir la aplicación, haga doble clic en este archivo HTML en su navegador.</p>
+  </div>
+
+  <div class="flex h-screen">
+    <!-- Sección lateral: Lista de entradas -->
+    <aside class="w-1/4 bg-gray-100 p-4 border-r border-gray-300 overflow-auto">
+      <h2 class="text-xl font-bold mb-4">Entradas</h2>
+      <ul id="listaEntradas" class="space-y-2"></ul>
+    </aside>
+
+    <!-- Área principal -->
+    <main class="w-3/4 p-8 relative overflow-auto">
+      <!-- Sección del editor: Crear nueva entrada -->
+      <section id="editorSeccion" class="space-y-4">
+        <h1 class="text-3xl font-bold mb-4">Nueva Entrada</h1>
+        <div class="flex flex-col space-y-2">
+          <label for="fecha" class="font-semibold">Fecha:</label>
+          <input type="date" id="fecha" class="p-2 border rounded w-full">
+        </div>
+        <div class="flex flex-col space-y-2">
+          <label for="titulo" class="font-semibold">Título:</label>
+          <input type="text" id="titulo" placeholder="Título de la entrada" class="p-2 border rounded w-full">
+        </div>
+        <div class="flex flex-col space-y-2">
+          <label for="contenido" class="font-semibold">Contenido:</label>
+          <textarea id="contenido" placeholder="Escribe tu entrada aquí..." class="p-2 border rounded w-full h-64"></textarea>
+        </div>
+        <div class="flex justify-end">
+          <button id="guardarEntrada" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded">
+            Guardar
+          </button>
+        </div>
+      </section>
+
+      <!-- Sección para mostrar el detalle de una entrada (modo ver) -->
+      <section id="detalleEntrada" class="hidden space-y-4">
+        <button id="btnNuevaEntrada" class="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded">
+          Nueva Entrada
+        </button>
+        <div class="bg-white p-4 border rounded shadow">
+          <h2 id="detalleTitulo" class="text-2xl font-bold"></h2>
+          <p id="detalleFecha" class="text-gray-600"></p>
+          <hr class="my-2">
+          <p id="detalleContenido" class="whitespace-pre-line"></p>
+        </div>
+        <div class="flex justify-end">
+          <button id="eliminarEntrada" class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded">
+            Eliminar Entrada
+          </button>
+        </div>
+      </section>
+
+      <!-- Placeholder cuando no hay entradas -->
+      <section id="placeholder" class="flex flex-col items-center justify-center h-full absolute top-0 left-0 w-full">
+        <h1 class="text-4xl font-bold text-gray-700 mb-4">¡Bienvenido a tu Diario Digital!</h1>
+        <p class="text-lg text-gray-500">Empieza escribiendo tu primera entrada...</p>
+      </section>
+    </main>
+  </div>
+
+  <script>
+    // Clave para almacenar las entradas en LocalStorage
+    const STORAGE_KEY = 'diarioEntradas';
+
+    // Elementos del DOM
+    const listaEntradas = document.getElementById('listaEntradas');
+    const editorSeccion = document.getElementById('editorSeccion');
+    const detalleEntrada = document.getElementById('detalleEntrada');
+    const placeholder = document.getElementById('placeholder');
+    const btnNuevaEntrada = document.getElementById('btnNuevaEntrada');
+    const guardarEntradaBtn = document.getElementById('guardarEntrada');
+    const eliminarEntradaBtn = document.getElementById('eliminarEntrada');
+    const fechaInput = document.getElementById('fecha');
+    const tituloInput = document.getElementById('titulo');
+    const contenidoInput = document.getElementById('contenido');
+    const detalleTitulo = document.getElementById('detalleTitulo');
+    const detalleFecha = document.getElementById('detalleFecha');
+    const detalleContenido = document.getElementById('detalleContenido');
+
+    let entradas = [];
+    let entradaActualId = null;
+
+    // Cargar entradas desde LocalStorage
+    function cargarEntradas() {
+      const stored = localStorage.getItem(STORAGE_KEY);
+      if (stored) {
+        entradas = JSON.parse(stored);
+      } else {
+        entradas = [];
+      }
+    }
+
+    // Guardar entradas en LocalStorage
+    function guardarEntradas() {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(entradas));
+    }
+
+    // Actualizar la lista de entradas en la barra lateral
+    function actualizarLista() {
+      listaEntradas.innerHTML = '';
+      if (entradas.length === 0) {
+        const li = document.createElement('li');
+        li.textContent = 'No hay entradas aún.';
+        li.className = 'text-gray-500';
+        listaEntradas.appendChild(li);
+      } else {
+        // Ordenar las entradas por fecha descendente
+        const entradasOrdenadas = entradas.slice().sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
+        entradasOrdenadas.forEach(entrada => {
+          const li = document.createElement('li');
+          li.className = 'flex justify-between items-center bg-white p-2 rounded shadow cursor-pointer hover:bg-gray-200';
+          li.innerHTML = `<span>${entrada.fecha} - ${entrada.titulo}</span>
+                          <button data-id="${entrada.id}" class="eliminar text-red-500 hover:text-red-700 text-sm">X</button>`;
+          // Al hacer clic en el elemento (excepto el botón de eliminar), mostrar el detalle
+          li.addEventListener('click', function(e) {
+            if(e.target.tagName.toLowerCase() !== 'button'){
+              mostrarDetalle(entrada.id);
+            }
+          });
+          // Botón para eliminar la entrada directamente desde la lista
+          li.querySelector('.eliminar').addEventListener('click', function(e) {
+            e.stopPropagation();
+            if(confirm('¿Seguro que deseas eliminar esta entrada?')){
+              eliminarPorId(entrada.id);
+            }
+          });
+          listaEntradas.appendChild(li);
+        });
+      }
+    }
+
+    // Mostrar el detalle de una entrada seleccionada
+    function mostrarDetalle(id) {
+      const entrada = entradas.find(e => e.id === id);
+      if(entrada) {
+        entradaActualId = id;
+        detalleTitulo.textContent = entrada.titulo;
+        detalleFecha.textContent = entrada.fecha;
+        detalleContenido.textContent = entrada.contenido;
+        // Ocultar el editor y el placeholder, mostrar el detalle
+        editorSeccion.classList.add('hidden');
+        placeholder.classList.add('hidden');
+        detalleEntrada.classList.remove('hidden');
+      }
+    }
+
+    // Eliminar entrada por ID
+    function eliminarPorId(id) {
+      entradas = entradas.filter(e => e.id !== id);
+      guardarEntradas();
+      actualizarLista();
+      // Si se está mostrando la entrada eliminada, volver al editor
+      if(entradaActualId === id) {
+        volverAlEditor();
+      }
+    }
+
+    // Volver al modo editor para crear una nueva entrada
+    function volverAlEditor() {
+      entradaActualId = null;
+      detalleEntrada.classList.add('hidden');
+      editorSeccion.classList.remove('hidden');
+      // Mostrar el placeholder solo si no hay entradas guardadas y los campos están vacíos
+      if(entradas.length === 0 && !fechaInput.value && !tituloInput.value && !contenidoInput.value){
+        placeholder.classList.remove('hidden');
+      } else {
+        placeholder.classList.add('hidden');
+      }
+      // Limpiar los campos del editor
+      fechaInput.value = '';
+      tituloInput.value = '';
+      contenidoInput.value = '';
+    }
+
+    // Guardar una nueva entrada
+    guardarEntradaBtn.addEventListener('click', function() {
+      const fecha = fechaInput.value;
+      const titulo = tituloInput.value.trim();
+      const contenido = contenidoInput.value.trim();
+      if(!fecha || !titulo || !contenido) {
+        alert('Por favor, completa todos los campos.');
+        return;
+      }
+      const nuevaEntrada = {
+        id: Date.now(),
+        fecha,
+        titulo,
+        contenido
+      };
+      entradas.push(nuevaEntrada);
+      guardarEntradas();
+      actualizarLista();
+      // Limpiar el formulario
+      fechaInput.value = '';
+      tituloInput.value = '';
+      contenidoInput.value = '';
+      // Ocultar el placeholder si estaba visible
+      placeholder.classList.add('hidden');
+      alert('Entrada guardada correctamente.');
+    });
+
+    // Botón para volver al editor desde el detalle de una entrada
+    btnNuevaEntrada.addEventListener('click', function() {
+      volverAlEditor();
+    });
+
+    // Botón para eliminar la entrada que se está mostrando
+    eliminarEntradaBtn.addEventListener('click', function() {
+      if(confirm('¿Seguro que deseas eliminar esta entrada?')){
+        eliminarPorId(entradaActualId);
+      }
+    });
+
+    // Inicializar la aplicación
+    function init() {
+      cargarEntradas();
+      actualizarLista();
+      // Mostrar el placeholder si no hay entradas guardadas
+      if(entradas.length === 0) {
+        placeholder.classList.remove('hidden');
+      } else {
+        placeholder.classList.add('hidden');
+      }
+    }
+
+    init();
+  </script>
+</body>
+</html>
